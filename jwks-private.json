@@ -1,0 +1,17 @@
+{
+  "key-f2f7dc75-413a-4752-bd19-b90e63859e93": {
+    "privateJWK": {
+      "kty": "RSA",
+      "n": "1lLnfqjjrb4TmZzQKeScwkQhsJFHFc0RNCa2gWnVobQTUCL-5YBwnDOamn_Q6c5njibi-jieDl44ToaUY-kEmuDmbA_qS4G0Kokq1fylCRhm6eXvNInxyhaKm3ecE5lIurLV2YiPfedtaTcqKErbto__NShotLEQtIorC3xSz8F43aoxAuv6fJxGnToLbFs8c8VBBAd0QE7S5wHMA6H-khzoPeQ-EcQyTypuj-Y2kyQLC8g45KQfOSA70jL6CHMbjU2bFfoLsBwejBRM4tjXUtme86aPPkIyUwPSSiKTkLaB1w933sCI0zgd5L_mmFHg3incb8g2IEZN1JSCk8hRlw",
+      "e": "AQAB",
+      "d": "M35jxFjLqzjZ-LRmh0o4J6y683NUQvasRX1vqBRHkbx0T3K5D2cWp1D2ulwvU52V39-T9U6ZGxakLKnFCWQ5CQU0F46TWmTlZrriIdu7wz2rrFLkcBkckNNtpgDM7SCNCt5g5w0afMOX1Am_BUNHGsvqI1l8Hr3UJ6xyvyW1t9hxcQLSfUriwEuHByjmNbZX8Gbrb9FIAAcF2HI37VGAyS4q9mo36PBpxM-3TnQyI6UW-c-CEgIr4Wemq0A6WqB_sPO71CmTpSDNnN3_kc2vK7vyPeN9ZUQJFNkGEkyyew6VOgguStKGIseAivV6XWU-lKm4plw1jLbmrqUdcB3acQ",
+      "p": "-LsUmL73i8aZ0JocJNiW1djojbfDe_dYbl145qwiBr1zbstcn7LCllGZdra5DWKG4-0T9zJ_QYRt5bsmeubJfBeZM-YWzCrQvahhG3YMWcMsOFCXjWjsafQSH72Knvxwle8eG9VwzIuF-IYLf6kiVS0vhdDydVz_BdUrLd3r5h0",
+      "q": "3JZnGtDsNIUywi-67oBQQjUKOcXdSWRCautHAxGyZiWk88vddMObK_wchpd4IjOV2-2IIlNa-YvtzqU6QNldf09o8-s5IGQnNVsKbUpgU2WuR3020ZEoar4NYuVAs6X6J3c4Aw5F7rlYithx6t7vGVVXo3Rz0M-P7qaMSNJr-EM",
+      "dp": "YF2i8jbyk43jZAWBJ-leLwX1u4pZy3qeIUxHnh9Mo43c3i0d-qV4bGK68VqDwaLNnhrpJFnFIe4b4eirVOx7XX-LFKdtZ7ai3wgQb2JCELjkNgFLZjcjeT1dlDyMK2KkgAJ_iMseA7F-uzW72L7_lT6HbfHxLfVUvL7FFuUnEyU",
+      "dq": "wRJbuFr5A5c6MEE6qppgpTJretm2sBAzGgZIp2UL8uAsGr9rXFIBNWR7S0q0easRFeg36WNwE0_om6B-9lfKwC2vPR-7ZqCCuO6wl6wr15L-EdCE9LTK3XLvoInsMdGqvHRa8EHD8AkGeLCuNNdgC5ppFMZOwIuL_WSFERAsNKU",
+      "qi": "IuChZeO6O8aeBes85t3ve249N06VOeXanas-kGw_UTyHmaXbb-xWgLGy9ZdQup6NFCxeR18mIfLOUgHUDRbE7wR3ZNu8UKF_MZXafLQ-jaVvQHJP6zLdqVIsQI3L6a3C92p2dDExvJJj0UUCLIfaiN3cu89slkkOgoSg_tKR944"
+    },
+    "created": "2025-08-20T20:24:09.042Z",
+    "description": "My first RSA key for learning"
+  }
+}
