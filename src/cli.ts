@@ -19,12 +19,14 @@ program
   .command('generate-key')
   .description('Generate a new key pair for JWT signing')
   .option('-a, --algorithm <algorithm>', 'Algorithm to use (RS256, ES256, Ed25519, etc.)', 'RS256')
+  .option('-n, --name <name>', 'Custom name for this key (otherwise a creative name will be generated)')
   .option('-d, --description <description>', 'Description for this key')
   .option('--no-explain', 'Skip educational explanations')
   .action(async (options) => {
     try {
       const kid = await jwksManager.generateKeyPair(
         options.algorithm,
+        options.name,
         options.description,
         options.explain
       );

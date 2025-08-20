@@ -2,7 +2,7 @@ import * as jose from 'jose';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { Logger, JWTEducator } from './utils';
+import { Logger, JWTEducator, generateCreativeName } from './utils';
 
 export interface JWKSKey {
   kty: string;
@@ -36,9 +36,16 @@ export class JWKSManager {
   private privateKeysPath: string;
   private keyPairs: Map<string, StoredKeyPair> = new Map();
 
-  constructor(jwksPath = './jwks.json') {
-    this.jwksPath = path.resolve(jwksPath);
-    this.privateKeysPath = this.jwksPath.replace('.json', '-private.json');
+  constructor(jwksDir = './jwt-keys') {
+    const keysDir = path.resolve(jwksDir);
+    
+    // Ensure the jwt-keys directory exists
+    if (!fs.existsSync(keysDir)) {
+      fs.mkdirSync(keysDir, { recursive: true });
+    }
+    
+    this.jwksPath = path.join(keysDir, 'jwks.json');
+    this.privateKeysPath = path.join(keysDir, 'jwks-private.json');
     // Note: Can't await in constructor, keys will be loaded lazily
   }
 
@@ -126,11 +133,6 @@ export class JWKSManager {
 
       fs.writeFileSync(this.privateKeysPath, JSON.stringify(privateKeysData, null, 2));
       Logger.success(`Private keys saved to: ${this.privateKeysPath}`);
-      
-      // Also save a backup with timestamp
-      const backupPath = this.jwksPath.replace('.json', `-backup-${Date.now()}.json`);
-      fs.writeFileSync(backupPath, JSON.stringify(publicJWKS, null, 2));
-      Logger.info(`Backup created: ${backupPath}`);
 
     } catch (error) {
       Logger.error(`Failed to save JWKS: ${error}`);
@@ -138,7 +140,7 @@ export class JWKSManager {
     }
   }
 
-  async generateKeyPair(algorithm: string, description?: string, explain = true): Promise<string> {
+  async generateKeyPair(algorithm: string, customName?: string, description?: string, explain = true): Promise<string> {
     if (explain) {
       Logger.section('🔑 Generating New Key Pair');
       JWTEducator.explainKeyPairs();
@@ -152,7 +154,7 @@ export class JWKSManager {
       Logger.success('Key pair generated successfully!');
 
       Logger.step(2, 'Creating unique key identifier (kid)');
-      const kid = `key-${uuidv4()}`;
+      const kid = customName || generateCreativeName();
       Logger.keyValue('Key ID (kid)', kid);
 
       Logger.step(3, 'Converting to JWK format');

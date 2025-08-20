@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { highlight } from 'cli-highlight';
 
 export class Logger {
   static info(message: string): void {
@@ -32,11 +33,11 @@ export class Logger {
   }
 
   static debug(label: string, data: any): void {
-    console.log(chalk.gray('🔍 Debug:'), chalk.bold(label));
+    console.log('🔍 Debug:', chalk.bold(label));
     if (typeof data === 'object') {
-      console.log(chalk.gray(JSON.stringify(data, null, 2)));
+      console.log(highlight(JSON.stringify(data, null, 2), { language: 'json' }));
     } else {
-      console.log(chalk.gray('   '), data);
+      console.log('   ', data);
     }
   }
 
@@ -158,4 +159,36 @@ export function formatJWTToken(token: string): void {
   } catch (error) {
     Logger.error(`Failed to parse token: ${error}`);
   }
+}
+
+const PETS = [
+  'cat', 'dog', 'rabbit', 'hamster', 'guinea-pig', 'ferret', 'bird', 'fish',
+  'turtle', 'lizard', 'snake', 'frog', 'axolotl', 'hedgehog', 'chinchilla',
+  'sugar-glider', 'parrot', 'canary', 'goldfish', 'betta', 'gecko', 'iguana',
+  'chameleon', 'tarantula', 'hermit-crab', 'mouse', 'rat', 'gerbil', 'dove',
+  'cockatiel', 'budgie', 'lovebird', 'finch', 'macaw', 'cockatoo', 'conure',
+  'penguin', 'dolphin', 'whale', 'shark', 'octopus', 'jellyfish', 'starfish',
+  'seahorse', 'crab', 'lobster', 'shrimp', 'bear', 'panda', 'koala', 'sloth',
+  'fox', 'wolf', 'deer', 'elk', 'moose', 'buffalo', 'elephant', 'giraffe',
+  'zebra', 'lion', 'tiger', 'cheetah', 'leopard', 'jaguar', 'lynx', 'bobcat',
+  'otter', 'seal', 'walrus', 'platypus', 'kangaroo', 'wallaby', 'wombat'
+];
+
+const ADJECTIVES = [
+  'happy', 'cheerful', 'bright', 'sunny', 'sparkly', 'bouncy', 'fluffy',
+  'cozy', 'gentle', 'kind', 'friendly', 'playful', 'curious', 'brave',
+  'bold', 'clever', 'smart', 'witty', 'funny', 'silly', 'goofy', 'quirky',
+  'adorable', 'cute', 'lovely', 'sweet', 'charming', 'delightful', 'magical',
+  'mystical', 'enchanting', 'glowing', 'shimmering', 'twinkling', 'radiant',
+  'vibrant', 'colorful', 'rainbow', 'golden', 'silver', 'crystal', 'diamond',
+  'smooth', 'soft', 'silky', 'velvet', 'peaceful', 'calm', 'serene', 'zen',
+  'wise', 'noble', 'majestic', 'royal', 'elegant', 'graceful', 'nimble',
+  'swift', 'quick', 'speedy', 'energetic', 'lively', 'spirited', 'zippy',
+  'mighty', 'strong', 'powerful', 'sturdy', 'solid', 'reliable', 'trusty'
+];
+
+export function generateCreativeName(): string {
+  const pet = PETS[Math.floor(Math.random() * PETS.length)];
+  const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  return `${adjective}-${pet}`;
 }
