@@ -30,3 +30,11 @@ coverage/
 
 # TypeScript cache
 *.tsbuildinfo
+
+# JWT Learning Tool generated files
+jwks.json
+jwks-private.json
+jwks-backup-*.json
+sessions/
+
+# Keep important config files in repo by being specific about exclusions
