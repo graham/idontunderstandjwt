@@ -29,6 +29,8 @@ export interface StoredKeyPair {
   jwk: JWKSKey;
   created: string;
   description?: string;
+  issuer?: string;
+  audience?: string;
 }
 
 export class JWKSManager {
@@ -158,7 +160,9 @@ export class JWKSManager {
               privateKey,
               jwk: publicJWK,
               created: privateKeyData.created,
-              ...(privateKeyData.description && { description: privateKeyData.description })
+              ...(privateKeyData.description && { description: privateKeyData.description }),
+              ...(privateKeyData.issuer && { issuer: privateKeyData.issuer }),
+              ...(privateKeyData.audience && { audience: privateKeyData.audience })
             };
             
             this.keyPairs.set(kid, storedKey);
@@ -187,7 +191,9 @@ export class JWKSManager {
       const privateKeyData = {
         privateJWK,
         created: keyPair.created,
-        description: keyPair.description
+        description: keyPair.description,
+        issuer: keyPair.issuer,
+        audience: keyPair.audience
       };
       
       const privateKeyPath = this.getPrivateKeyPath(keyPair.kid);
@@ -227,7 +233,7 @@ export class JWKSManager {
     }
   }
 
-  async generateKeyPair(algorithm: string, customName?: string, description?: string, explain = true): Promise<string> {
+  async generateKeyPair(algorithm: string, customName?: string, description?: string, issuer?: string, audience?: string, explain = true): Promise<string> {
     if (explain) {
       Logger.section('🔑 Generating New Key Pair');
       JWTEducator.explainKeyPairs();
@@ -269,7 +275,9 @@ export class JWKSManager {
         privateKey,
         jwk,
         created: new Date().toISOString(),
-        ...(description && { description })
+        ...(description && { description }),
+        ...(issuer && { issuer }),
+        ...(audience && { audience })
       };
 
       this.keyPairs.set(kid, storedKey);
@@ -490,5 +498,215 @@ export class JWKSManager {
       Logger.error(`Failed to clear keys: ${error}`);
       return false;
     }
+  }
+
+  async exportPrivateKeyAsPKCS8(kid: string, explain = true): Promise<string> {
+    await this.ensureKeysLoaded();
+    
+    const keyPair = this.keyPairs.get(kid);
+    if (!keyPair) {
+      throw new Error(`Key not found: ${kid}`);
+    }
+
+    if (explain) {
+      Logger.section('📤 Exporting Private Key as PKCS8');
+      Logger.explain(
+        'PKCS8 Format',
+        'PKCS8 is a standard format for private keys used by Convex and many other systems.\n' +
+        'It starts with "-----BEGIN PRIVATE KEY-----" and is base64 encoded.\n' +
+        'For environment variables, newlines are replaced with spaces.'
+      );
+    }
+
+    try {
+      // Export the private key as PKCS8 PEM format
+      const pkcs8Pem = await jose.exportPKCS8(keyPair.privateKey);
+      
+      if (explain) {
+        Logger.success(`Private key for ${kid} exported as PKCS8`);
+        Logger.info('This format is suitable for Convex JWT_PRIVATE_KEY environment variable');
+      }
+      
+      return pkcs8Pem;
+    } catch (error) {
+      Logger.error(`Failed to export private key as PKCS8: ${error}`);
+      throw error;
+    }
+  }
+
+  async exportPublicKeyAsSPKI(kid: string, explain = true): Promise<string> {
+    await this.ensureKeysLoaded();
+    
+    const keyPair = this.keyPairs.get(kid);
+    if (!keyPair) {
+      throw new Error(`Key not found: ${kid}`);
+    }
+
+    if (explain) {
+      Logger.section('📤 Exporting Public Key as SPKI');
+      Logger.explain(
+        'SPKI Format',
+        'SPKI is a standard format for public keys.\n' +
+        'It starts with "-----BEGIN PUBLIC KEY-----" and is base64 encoded.\n' +
+        'This key can be shared publicly and is used for JWT verification.'
+      );
+    }
+
+    try {
+      // Export the public key as SPKI PEM format
+      const spkiPem = await jose.exportSPKI(keyPair.publicKey);
+      
+      if (explain) {
+        Logger.success(`Public key for ${kid} exported as SPKI`);
+        Logger.info('This format can be shared publicly for JWT verification');
+      }
+      
+      return spkiPem;
+    } catch (error) {
+      Logger.error(`Failed to export public key as SPKI: ${error}`);
+      throw error;
+    }
+  }
+
+  async exportJWKSAsBase64(kids?: string[], explain = true): Promise<string> {
+    await this.ensureKeysLoaded();
+    if (explain) {
+      Logger.section('📤 Exporting JWKS as Base64');
+      Logger.explain(
+        'Base64 JWKS Data URI',
+        'Creates a data URI with base64-encoded JWKS for use in environment variables.\n' +
+        'Format: "data:text/plain;charset=utf-8;base64,{encoded-jwks}"\n' +
+        'This allows Convex to load your public keys for JWT verification.'
+      );
+    }
+
+    let jwks: JWKS;
+    
+    if (kids && kids.length > 0) {
+      // Export specific keys
+      const selectedKeys = kids.map(kid => {
+        const keyPair = this.keyPairs.get(kid);
+        if (!keyPair) {
+          throw new Error(`Key not found: ${kid}`);
+        }
+        const publicJWK = { ...keyPair.jwk };
+        delete publicJWK.d; // Remove private key component
+        return publicJWK;
+      });
+      
+      jwks = { keys: selectedKeys };
+    } else {
+      // Export all public keys
+      jwks = this.getPublicJWKS();
+    }
+
+    // Convert to base64 data URI
+    const jwksJson = JSON.stringify(jwks);
+    const base64Jwks = Buffer.from(jwksJson, 'utf-8').toString('base64');
+    const dataUri = `data:text/plain;charset=utf-8;base64,${base64Jwks}`;
+
+    if (explain) {
+      const keyCount = jwks.keys.length;
+      Logger.success(`JWKS with ${keyCount} key(s) encoded as base64 data URI`);
+      Logger.info('This format is suitable for Convex JWKS environment variable');
+    }
+
+    return dataUri;
+  }
+
+  async setKeyIssuerAudience(kid: string, issuer?: string, audience?: string, explain = true): Promise<boolean> {
+    await this.ensureKeysLoaded();
+    
+    const keyPair = this.keyPairs.get(kid);
+    if (!keyPair) {
+      throw new Error(`Key not found: ${kid}`);
+    }
+
+    if (explain) {
+      Logger.section('⚙️  Configuring Key Issuer and Audience');
+      Logger.explain(
+        'JWT Issuer and Audience Claims',
+        'Issuer (iss): Identifies who issued the JWT (e.g., "https://myapp.com")\n' +
+        'Audience (aud): Identifies who the JWT is intended for (e.g., "convex" or "myapp-api")\n' +
+        'These claims are crucial for security and must match your Convex auth configuration.'
+      );
+    }
+
+    // Update the stored key pair
+    keyPair.issuer = issuer;
+    keyPair.audience = audience;
+
+    // Save the updated key pair
+    await this.saveKey(keyPair);
+
+    if (explain) {
+      Logger.success(`Updated key ${kid} configuration:`);
+      if (issuer) Logger.keyValue('Issuer (iss)', issuer);
+      if (audience) Logger.keyValue('Audience (aud)', audience);
+    }
+
+    return true;
+  }
+
+  async exportForConvexEnv(kid: string, issuer?: string, audience?: string, explain = true): Promise<{privateKey: string, publicKey: string, jwks: string, issuer?: string, audience?: string}> {
+    await this.ensureKeysLoaded();
+    
+    const keyPair = this.keyPairs.get(kid);
+    if (!keyPair) {
+      throw new Error(`Key not found: ${kid}`);
+    }
+
+    if (explain) {
+      Logger.section('🔧 Exporting for Convex Environment Variables');
+      Logger.info(`Preparing key "${kid}" for Convex deployment...`);
+    }
+
+    // Use provided issuer/audience or fall back to stored values
+    const finalIssuer = issuer || keyPair.issuer;
+    const finalAudience = audience || keyPair.audience;
+
+    // Get PKCS8 private key
+    const pkcs8 = await this.exportPrivateKeyAsPKCS8(kid, false);
+    
+    // Get SPKI public key
+    const spki = await this.exportPublicKeyAsSPKI(kid, false);
+    
+    // Format for environment variable (replace newlines with spaces)
+    const envPrivateKey = pkcs8.trimEnd().replace(/\n/g, ' ');
+    const envPublicKey = spki.trimEnd().replace(/\n/g, ' ');
+    
+    // Get JWKS for this specific key
+    const jwks = await this.exportJWKSAsBase64([kid], false);
+
+    if (explain) {
+      Logger.success('Environment variables prepared:');
+      Logger.keyValue('JWT_PRIVATE_KEY', `"${envPrivateKey.substring(0, 60)}..."`);
+      Logger.keyValue('JWT_PUBLIC_KEY', `"${envPublicKey.substring(0, 60)}..."`);
+      Logger.keyValue('JWKS', `"${jwks.substring(0, 60)}..."`);
+      if (finalIssuer) Logger.keyValue('Issuer', finalIssuer);
+      if (finalAudience) Logger.keyValue('Audience', finalAudience);
+      
+      Logger.info('\nConvex Configuration:');
+      Logger.info('Add these to your environment variables and create:');
+      Logger.info('convex/auth.config.ts with:');
+      if (finalIssuer || finalAudience) {
+        console.log(`export default {
+  providers: [
+    {
+      type: "customJwt",${finalAudience ? `\n      applicationID: "${finalAudience}",` : ''}${finalIssuer ? `\n      issuer: "${finalIssuer}",` : ''}
+      jwks: process.env.JWKS,
+    },
+  ],
+};`);
+      }
+    }
+
+    return {
+      privateKey: envPrivateKey,
+      publicKey: envPublicKey,
+      jwks: jwks,
+      ...(finalIssuer && { issuer: finalIssuer }),
+      ...(finalAudience && { audience: finalAudience })
+    };
   }
 }

@@ -21,6 +21,8 @@ program
   .option('-a, --algorithm <algorithm>', 'Algorithm to use (RS256, ES256, Ed25519, etc.)', 'RS256')
   .option('-n, --name <name>', 'Custom name for this key (otherwise a creative name will be generated)')
   .option('-d, --description <description>', 'Description for this key')
+  .option('-i, --issuer <issuer>', 'JWT issuer (iss) claim - who issued the token')
+  .option('--audience <audience>', 'JWT audience (aud) claim - who the token is for')
   .option('--no-explain', 'Skip educational explanations')
   .action(async (options) => {
     try {
@@ -28,6 +30,8 @@ program
         options.algorithm,
         options.name,
         options.description,
+        options.issuer,
+        options.audience,
         options.explain
       );
       Logger.success(`\n🎉 Key generated successfully with ID: ${kid}`);
@@ -291,6 +295,179 @@ program
       process.exit(success ? 0 : 1);
     } catch (error) {
       Logger.error(`Failed to remove session: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Configure Key Command
+program
+  .command('configure-key')
+  .description('Configure issuer and audience for an existing key')
+  .requiredOption('-k, --key <key>', 'Key to configure')
+  .option('-i, --issuer <issuer>', 'JWT issuer (iss) claim - who issued the token')
+  .option('-a, --audience <audience>', 'JWT audience (aud) claim - who the token is for')
+  .option('--no-explain', 'Skip educational explanations')
+  .action(async (options) => {
+    try {
+      if (!options.issuer && !options.audience) {
+        Logger.error('Please specify --issuer and/or --audience');
+        process.exit(1);
+      }
+
+      await jwksManager.setKeyIssuerAudience(
+        options.key,
+        options.issuer,
+        options.audience,
+        options.explain
+      );
+
+    } catch (error) {
+      Logger.error(`Failed to configure key: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Individual Export Commands
+program
+  .command('export')
+  .description('Export individual JWT components (public-key, private-key, jwks)')
+  .argument('<type>', 'What to export: public-key, private-key, or jwks')
+  .requiredOption('-k, --key <key>', 'Key ID to export from')
+  .option('--format <format>', 'Output format: pem (default) or raw', 'pem')
+  .option('--no-explain', 'Skip educational explanations')
+  .action(async (type, options) => {
+    try {
+      const validTypes = ['public-key', 'private-key', 'jwks'];
+      if (!validTypes.includes(type)) {
+        console.error(`Error: Invalid export type: ${type}`);
+        console.error('Valid types: public-key, private-key, jwks');
+        process.exit(1);
+      }
+
+      // Temporarily suppress console output for clean piping
+      const originalLog = console.log;
+      const originalInfo = console.info;
+      const originalError = console.error;
+      
+      // Redirect all console output to stderr or null during the operation
+      console.log = () => {};
+      console.info = () => {};
+      console.error = () => {};
+
+      let output = '';
+
+      try {
+        switch (type) {
+          case 'public-key':
+            output = await jwksManager.exportPublicKeyAsSPKI(options.key, false);
+            break;
+
+          case 'private-key':
+            output = await jwksManager.exportPrivateKeyAsPKCS8(options.key, false);
+            break;
+
+          case 'jwks':
+            if (options.format === 'raw') {
+              // Export raw JWKS JSON for specific key
+              output = await jwksManager.exportJWKSAsBase64([options.key], false);
+              // Decode the base64 to get raw JSON
+              const base64Data = output.replace('data:text/plain;charset=utf-8;base64,', '');
+              const jwksJson = Buffer.from(base64Data, 'base64').toString('utf-8');
+              output = JSON.stringify(JSON.parse(jwksJson), null, 2);
+            } else {
+              // Export base64-encoded JWKS (default)
+              output = await jwksManager.exportJWKSAsBase64([options.key], false);
+            }
+            break;
+        }
+      } finally {
+        // Restore console methods
+        console.log = originalLog;
+        console.info = originalInfo;
+        console.error = originalError;
+      }
+
+      // Output only the raw content for piping
+      console.log(output);
+
+    } catch (error) {
+      console.error(`Error: Failed to export ${type}: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Export Environment Variables Command
+program
+  .command('export-env')
+  .description('Export JWT keys as environment variables for Convex')
+  .option('-k, --key <key>', 'Specific key to export (exports both private key and JWKS)')
+  .option('--jwks-only', 'Export only JWKS (all public keys) without private key')
+  .option('--all-keys', 'Export JWKS containing all public keys')
+  .option('-i, --issuer <issuer>', 'JWT issuer (iss) claim - who issued the token')
+  .option('-a, --audience <audience>', 'JWT audience (aud) claim - who the token is for')
+  .option('-f, --format <format>', 'Output format: console, file, or env-file', 'console')
+  .option('-o, --output <file>', 'Output file path (when format is file or env-file)')
+  .option('--no-explain', 'Skip educational explanations')
+  .action(async (options) => {
+    try {
+      if (!options.key && !options.jwksOnly && !options.allKeys) {
+        Logger.error('Please specify --key <key-name>, --jwks-only, or --all-keys');
+        Logger.info('Use "list-keys" to see available keys');
+        process.exit(1);
+      }
+
+      let output = '';
+
+      if (options.key) {
+        // Export specific key (both private and public)
+        const result = await jwksManager.exportForConvexEnv(options.key, options.issuer, options.audience, options.explain);
+        
+        if (options.format === 'env-file') {
+          output = `JWT_PRIVATE_KEY="${result.privateKey}"\nJWT_PUBLIC_KEY="${result.publicKey}"\nJWKS="${result.jwks}"`;
+          if (result.issuer) output += `\nCONVEX_JWT_ISSUER="${result.issuer}"`;
+          if (result.audience) output += `\nCONVEX_JWT_AUDIENCE="${result.audience}"`;
+          output += '\n';
+        } else {
+          output = `JWT_PRIVATE_KEY="${result.privateKey}"\nJWT_PUBLIC_KEY="${result.publicKey}"\nJWKS="${result.jwks}"`;
+          if (result.issuer) output += `\nCONVEX_JWT_ISSUER="${result.issuer}"`;
+          if (result.audience) output += `\nCONVEX_JWT_AUDIENCE="${result.audience}"`;
+        }
+      } else if (options.jwksOnly || options.allKeys) {
+        // Export only JWKS (all public keys)
+        const jwks = await jwksManager.exportJWKSAsBase64(undefined, options.explain);
+        
+        if (options.format === 'env-file') {
+          output = `JWKS="${jwks}"\n`;
+        } else {
+          output = `JWKS="${jwks}"`;
+        }
+      }
+
+      // Output handling
+      if (options.format === 'file' || options.format === 'env-file') {
+        if (!options.output) {
+          Logger.error('Output file required when using --format file or env-file');
+          process.exit(1);
+        }
+        
+        const fs = require('fs');
+        fs.writeFileSync(options.output, output);
+        Logger.success(`Environment variables exported to: ${options.output}`);
+      } else {
+        // Console output
+        Logger.section('🌍 Convex Environment Variables');
+        console.log('\n' + output + '\n');
+        
+        if (options.explain) {
+          Logger.info('Usage instructions:');
+          Logger.info('1. Copy the above environment variables');
+          Logger.info('2. Add them to your Convex dashboard or .env file');
+          Logger.info('3. Configure your Convex auth to use these values');
+        }
+      }
+
+    } catch (error) {
+      Logger.error(`Failed to export environment variables: ${error}`);
       process.exit(1);
     }
   });
