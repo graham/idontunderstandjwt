@@ -295,6 +295,77 @@ program
     }
   });
 
+// Clear Command
+program
+  .command('clear')
+  .description('Clear all generated keys and/or sessions')
+  .option('--keys-only', 'Clear only keys, keep sessions')
+  .option('--sessions-only', 'Clear only sessions, keep keys')
+  .option('--include-backups', 'Also remove backup files')
+  .option('--force', 'Skip confirmation prompt')
+  .option('--no-explain', 'Skip educational explanations')
+  .action(async (options) => {
+    try {
+      const clearKeys = !options.sessionsOnly;
+      const clearSessions = !options.keysOnly;
+      
+      if (options.explain) {
+        Logger.section('🧹 Clear All Data');
+        Logger.info('This command will remove:');
+        if (clearKeys) Logger.info('  • All JWT keys and JWKS files');
+        if (clearSessions) Logger.info('  • All authentication sessions');
+        if (options.includeBackups) Logger.info('  • All backup files');
+      }
+
+      // Confirmation prompt unless --force is used
+      if (!options.force) {
+        const readline = require('readline');
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+
+        const answer = await new Promise<string>((resolve) => {
+          rl.question('\n⚠️  Are you sure you want to clear this data? (yes/no): ', resolve);
+        });
+        rl.close();
+
+        if (answer.toLowerCase() !== 'yes' && answer.toLowerCase() !== 'y') {
+          Logger.info('Clear operation cancelled');
+          return;
+        }
+      }
+
+      let success = true;
+
+      // Clear keys if requested
+      if (clearKeys) {
+        const keysSuccess = await jwksManager.clearAll(options.includeBackups, options.explain);
+        success = success && keysSuccess;
+      }
+
+      // Clear sessions if requested
+      if (clearSessions) {
+        const sessionsSuccess = sessionManager.clearAllSessions(options.explain);
+        success = success && sessionsSuccess;
+      }
+
+      if (success) {
+        Logger.success('\n🎉 Clear operation completed successfully!');
+        if (options.explain) {
+          Logger.info('You now have a clean slate for learning and experimentation.');
+        }
+      } else {
+        Logger.error('Some operations failed during clear');
+        process.exit(1);
+      }
+
+    } catch (error) {
+      Logger.error(`Failed to clear data: ${error}`);
+      process.exit(1);
+    }
+  });
+
 // Educational Commands
 
 // JWT Basics Command

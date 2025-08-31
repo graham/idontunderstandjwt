@@ -54,7 +54,7 @@ JWTs are everywhere in modern web development, but they can be confusing. This t
 1. **Clone and install**
    ```bash
    git clone <repository-url>
-   cd jwttest
+   cd idontunderstandjwt
    npm install
    ```
 
@@ -114,19 +114,23 @@ npm run cli -- get-session-token -n alice-session
 ### Key Management
 ```bash
 # Generate different types of keys
-npm run cli -- generate-key                           # RS256 (default)
-npm run cli -- generate-key -a ES256                  # ECDSA
-npm run cli -- generate-key -a Ed25519                # EdDSA
-npm run cli -- generate-key -d "My signing key"       # With description
+npm run cli -- generate-key                           # RS256 (default) with creative name
+npm run cli -- generate-key -a ES256                  # ECDSA with creative name
+npm run cli -- generate-key -a Ed25519                # EdDSA with creative name
+npm run cli -- generate-key -d "My signing key"       # With description (gets creative name)
 
-# List all keys
+# Generate with custom names
+npm run cli -- generate-key -n my-api-key             # Custom name
+npm run cli -- generate-key -n prod-key -d "Production key"  # Custom name + description
+
+# List all keys (shows creative names like "fluffy-cat", "strong-seahorse")
 npm run cli -- list-keys
 
 # Export public keys (safe to share)
 npm run cli -- export-jwks -o public-keys.json
 
-# Remove a key
-npm run cli -- remove-key -k <key-id>
+# Remove a key (use the creative name as key-id)
+npm run cli -- remove-key -k fluffy-cat
 ```
 
 ### Token Operations
@@ -170,6 +174,27 @@ npm run cli -- compare-algorithms
 
 # Skip explanations for faster operation
 npm run cli -- <any-command> --no-explain
+```
+
+### Cleanup Commands
+```bash
+# Clear everything (with confirmation)
+npm run cli -- clear
+
+# Clear everything without confirmation
+npm run cli -- clear --force
+
+# Clear only keys, keep sessions
+npm run cli -- clear --keys-only
+
+# Clear only sessions, keep keys
+npm run cli -- clear --sessions-only
+
+# Also remove backup files
+npm run cli -- clear --include-backups
+
+# Silent cleanup (no explanations)
+npm run cli -- clear --no-explain --force
 ```
 
 ## 💡 Real-World Examples
@@ -220,26 +245,31 @@ npm run cli -- create-token -k <ed25519-key> -s alice
 
 ```
 your-project/
-├── jwks.json              # Public keys (safe to share)
-├── jwks-private.json      # Private keys (keep secret!)
-├── sessions/              # Authentication sessions
-│   ├── alice-session.json
-│   └── bob-session.json
-└── jwks-backup-*.json     # Automatic backups
+├── jwt-keys/              # JWT key storage directory
+│   ├── fluffy-cat.json           # Public key for "fluffy-cat"
+│   ├── fluffy-cat-private.json   # Private key for "fluffy-cat" (keep secret!)
+│   ├── strong-seahorse.json      # Public key for "strong-seahorse"  
+│   ├── strong-seahorse-private.json  # Private key for "strong-seahorse" (keep secret!)
+│   └── jwks.json                 # Combined public JWKS (for compatibility)
+└── sessions/              # Authentication sessions
+    ├── alice-session.json
+    └── bob-session.json
 ```
 
 ### File Purposes
 
-- **`jwks.json`** - Contains public keys in standard JWKS format. Safe to share with other services that need to verify your tokens.
-- **`jwks-private.json`** - Contains private keys for signing. **Keep this secret!**
-- **`sessions/`** - Stores authentication sessions with access/refresh token pairs.
-- **Backups** - Automatic timestamped backups of your JWKS when changes are made.
+- **`jwt-keys/`** - Directory containing all JWT key files, organized by key name
+- **`{key-name}.json`** (e.g., `fluffy-cat.json`) - Individual public key files. Safe to share with other services.
+- **`{key-name}-private.json`** (e.g., `fluffy-cat-private.json`) - Individual private key files for signing. **Keep these secret!**
+- **`jwt-keys/jwks.json`** - Combined public JWKS containing all public keys. Used for compatibility and exports.
+- **`sessions/`** - Directory storing authentication sessions with access/refresh token pairs.
+- **`{session-name}.json`** (e.g., `alice-session.json`) - Individual session files with token data.
 
 ## 🔒 Security Notes
 
 ### ⚠️ **Important Security Considerations**
 
-1. **Private Keys** - Never share `jwks-private.json` or commit it to version control
+1. **Private Keys** - Never share `*-private.json` files or commit them to version control
 2. **Token Expiration** - Use short-lived access tokens (15 minutes) with longer refresh tokens
 3. **Key Rotation** - Regularly generate new keys and phase out old ones
 4. **Issuer/Audience** - Always validate these claims in production
@@ -313,7 +343,7 @@ Contributions welcome! This tool is designed to be educational, so:
 ### Development Setup
 ```bash
 git clone <repository-url>
-cd jwttest
+cd idontunderstandjwt
 npm install
 npm run dev    # Watch mode for development
 npm run lint   # Check code quality

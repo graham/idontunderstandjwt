@@ -339,6 +339,47 @@ export class SessionManager {
     return true;
   }
 
+  clearAllSessions(explain = true): boolean {
+    try {
+      if (explain) {
+        Logger.section('🧹 Clearing All Sessions');
+        Logger.warning('This will remove all authentication sessions!');
+      }
+
+      const sessionNames = this.listSessions(false);
+      
+      if (sessionNames.length === 0) {
+        if (explain) {
+          Logger.info('No sessions found to clear');
+        }
+        return true;
+      }
+
+      let removedCount = 0;
+      for (const sessionName of sessionNames) {
+        if (this.removeSession(sessionName, false)) {
+          removedCount++;
+          if (explain) {
+            Logger.success(`Removed session: ${sessionName}`);
+          }
+        }
+      }
+
+      if (explain) {
+        Logger.success(`Cleared ${removedCount} sessions`);
+        Logger.warning(
+          '⚠️  All session tokens are now considered invalid.\n' +
+          '   (Note: The actual JWT tokens don\'t know they\'re "invalid" until they expire)'
+        );
+      }
+
+      return true;
+    } catch (error) {
+      Logger.error(`Failed to clear sessions: ${error}`);
+      return false;
+    }
+  }
+
   private parseTTL(ttl: string): number {
     // Convert TTL string to seconds
     if (ttl.endsWith('h')) {
