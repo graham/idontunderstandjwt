@@ -38,3 +38,5 @@ jwks-backup-*.json
 sessions/
 
 # Keep important config files in repo by being specific about exclusions
+
+jwt-keys/
