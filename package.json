@@ -1,11 +1,11 @@
 {
   "name": "idontunderstandjwt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Educational JWT token management tool for learning JWT concepts",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "jwt-learner": "dist/index.js"
+    "idontunderstandjwt": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

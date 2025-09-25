@@ -118,6 +118,95 @@ export class SessionManager {
     return sessionData;
   }
 
+  async createSessionWithIssuerAudience(
+    sessionName: string,
+    subject: string,
+    keyId: string,
+    jwtOps: JWTOperations,
+    customClaims: Record<string, any> = {},
+    accessTokenTTL = '15m',
+    refreshTokenTTL = '7d',
+    issuer?: string,
+    audience?: string,
+    explain = true
+  ): Promise<SessionData> {
+    if (explain) {
+      Logger.section('📁 Creating Authentication Session with Issuer/Audience');
+      Logger.explain(
+        'Session Management with Claims',
+        'Creating a session with specific issuer and audience claims:\n' +
+        '   • Issuer (iss): Who issued the tokens\n' +
+        '   • Audience (aud): Who the tokens are intended for\n' +
+        '   • These claims help verify token authenticity'
+      );
+    }
+
+    Logger.step(1, `Creating session: ${sessionName}`);
+    Logger.keyValue('Subject (User)', subject);
+    Logger.keyValue('Key ID', keyId);
+    if (issuer) Logger.keyValue('Issuer', issuer);
+    if (audience) Logger.keyValue('Audience', audience);
+    Logger.keyValue('Access Token TTL', accessTokenTTL);
+    Logger.keyValue('Refresh Token TTL', refreshTokenTTL);
+
+    const sessionPath = this.getSessionFilePath(sessionName);
+    
+    if (fs.existsSync(sessionPath)) {
+      Logger.warning(`Session file already exists: ${sessionName}`);
+      Logger.info('Use refresh-session to update an existing session');
+      throw new Error(`Session ${sessionName} already exists`);
+    }
+
+    Logger.step(2, 'Generating access and refresh token pair with issuer/audience');
+    const { accessToken, refreshToken, sessionId } = await jwtOps.createAccessRefreshTokenPairWithClaims(
+      keyId,
+      subject,
+      customClaims,
+      accessTokenTTL,
+      refreshTokenTTL,
+      issuer,
+      audience,
+      false // Don't explain here, we already did above
+    );
+
+    // Calculate expiry times
+    const now = new Date();
+    const accessExpiry = new Date(now.getTime() + this.parseTTL(accessTokenTTL) * 1000);
+    const refreshExpiry = new Date(now.getTime() + this.parseTTL(refreshTokenTTL) * 1000);
+
+    Logger.step(3, 'Creating session data');
+    const sessionData: SessionData = {
+      sessionId,
+      sessionName,
+      subject,
+      keyId,
+      accessToken,
+      refreshToken,
+      accessTokenExpiry: accessExpiry,
+      refreshTokenExpiry: refreshExpiry,
+      created: now,
+      customClaims
+    };
+
+    Logger.step(4, 'Saving session to file');
+    fs.writeFileSync(sessionPath, JSON.stringify(sessionData, null, 2));
+    Logger.success(`Session saved: ${sessionPath}`);
+
+    if (explain) {
+      Logger.explain(
+        'Session Created with Claims',
+        `Session "${sessionName}" is now ready to use!\n` +
+        `   • Access token expires: ${accessExpiry.toLocaleString()}\n` +
+        `   • Refresh token expires: ${refreshExpiry.toLocaleString()}\n` +
+        `   • Session file: ${sessionPath}` +
+        (issuer ? `\n   • Issuer: ${issuer}` : '') +
+        (audience ? `\n   • Audience: ${audience}` : '')
+      );
+    }
+
+    return sessionData;
+  }
+
   loadSession(sessionName: string, explain = true): SessionData {
     if (explain) {
       Logger.section('📂 Loading Authentication Session');

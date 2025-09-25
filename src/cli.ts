@@ -12,17 +12,30 @@ const sessionManager = new SessionManager();
 program
   .name('jwt-learner')
   .description('Educational JWT token management tool')
-  .version('1.0.0');
+  .version('1.0.1');
 
 // Generate Key Command
 program
   .command('generate-key')
   .description('Generate a new key pair for JWT signing')
-  .option('-a, --algorithm <algorithm>', 'Algorithm to use (RS256, ES256, Ed25519, etc.)', 'RS256')
-  .option('-n, --name <name>', 'Custom name for this key (otherwise a creative name will be generated)')
+  .option(
+    '-a, --algorithm <algorithm>',
+    'Algorithm to use (RS256, ES256, Ed25519, etc.)',
+    'RS256'
+  )
+  .option(
+    '-n, --name <name>',
+    'Custom name for this key (otherwise a creative name will be generated)'
+  )
   .option('-d, --description <description>', 'Description for this key')
-  .option('-i, --issuer <issuer>', 'JWT issuer (iss) claim - who issued the token')
-  .option('--audience <audience>', 'JWT audience (aud) claim - who the token is for')
+  .option(
+    '-i, --issuer <issuer>',
+    'JWT issuer (iss) claim - who issued the token'
+  )
+  .option(
+    '--audience <audience>',
+    'JWT audience (aud) claim - who the token is for'
+  )
   .option('--no-explain', 'Skip educational explanations')
   .action(async (options) => {
     try {
@@ -64,16 +77,20 @@ program
   .option('-s, --subject <subject>', 'Subject (user ID)')
   .option('-i, --issuer <issuer>', 'Token issuer')
   .option('-a, --audience <audience>', 'Token audience')
-  .option('-e, --expires <expires>', 'Expiration time (1h, 30m, 7d, etc.)', '1h')
+  .option(
+    '-e, --expires <expires>',
+    'Expiration time (1h, 30m, 7d, etc.)',
+    '1h'
+  )
   .option('--no-explain', 'Skip educational explanations')
   .action(async (options) => {
     try {
       let payload: any = {};
-      
+
       if (options.payload !== '{}') {
         payload = JSON.parse(options.payload);
       }
-      
+
       if (options.subject) payload.sub = options.subject;
       if (options.issuer) payload.iss = options.issuer;
       if (options.audience) payload.aud = options.audience;
@@ -87,7 +104,6 @@ program
 
       Logger.success('\n🎫 JWT Token Created:');
       console.log(token);
-
     } catch (error) {
       Logger.error(`Failed to create token: ${error}`);
       process.exit(1);
@@ -111,9 +127,8 @@ program
         options.explain
       );
 
-      const successCount = results.filter(r => r.success).length;
+      const successCount = results.filter((r) => r.success).length;
       process.exit(successCount > 0 ? 0 : 1);
-
     } catch (error) {
       Logger.error(`Failed to verify token: ${error}`);
       process.exit(1);
@@ -174,7 +189,9 @@ program
 // Create Session Command
 program
   .command('create-session')
-  .description('Create a new authentication session with access and refresh tokens')
+  .description(
+    'Create a new authentication session with access and refresh tokens'
+  )
   .requiredOption('-n, --name <name>', 'Session name')
   .requiredOption('-s, --subject <subject>', 'Subject (user ID)')
   .requiredOption('-k, --kid <kid>', 'Key ID to use for signing')
@@ -199,7 +216,6 @@ program
         options.refreshTtl,
         options.explain
       );
-
     } catch (error) {
       Logger.error(`Failed to create session: ${error}`);
       process.exit(1);
@@ -260,23 +276,30 @@ program
   .action((options) => {
     try {
       const sessionData = sessionManager.loadSession(options.name, false);
-      
-      const token = options.type === 'refresh' ? sessionData.refreshToken : sessionData.accessToken;
-      const expiry = options.type === 'refresh' ? sessionData.refreshTokenExpiry : sessionData.accessTokenExpiry;
-      
-      Logger.info(`${options.type.toUpperCase()} token for session: ${options.name}`);
+
+      const token =
+        options.type === 'refresh'
+          ? sessionData.refreshToken
+          : sessionData.accessToken;
+      const expiry =
+        options.type === 'refresh'
+          ? sessionData.refreshTokenExpiry
+          : sessionData.accessTokenExpiry;
+
+      Logger.info(
+        `${options.type.toUpperCase()} token for session: ${options.name}`
+      );
       Logger.keyValue('Expires', expiry.toLocaleString());
-      
+
       const now = new Date();
       if (now >= expiry) {
         Logger.warning('⚠️  Token has expired!');
       } else {
         Logger.success('✅ Token is valid');
       }
-      
+
       console.log('\nToken:');
       console.log(token);
-
     } catch (error) {
       Logger.error(`Failed to get session token: ${error}`);
       process.exit(1);
@@ -291,10 +314,59 @@ program
   .option('--no-explain', 'Skip educational explanations')
   .action((options) => {
     try {
-      const success = sessionManager.removeSession(options.name, options.explain);
+      const success = sessionManager.removeSession(
+        options.name,
+        options.explain
+      );
       process.exit(success ? 0 : 1);
     } catch (error) {
       Logger.error(`Failed to remove session: ${error}`);
+      process.exit(1);
+    }
+  });
+
+// Generate Session Command
+program
+  .command('generate-session')
+  .description(
+    'Generate a new authentication session with access and refresh tokens including issuer and audience'
+  )
+  .requiredOption('-n, --name <name>', 'Session name')
+  .requiredOption('-s, --subject <subject>', 'Subject (user ID)')
+  .requiredOption('-k, --kid <kid>', 'Key ID to use for signing')
+  .option('-p, --payload <payload>', 'JSON payload for custom claims', '{}')
+  .option(
+    '-i, --issuer <issuer>',
+    'JWT issuer (iss) claim - who issued the token (overrides key default)'
+  )
+  .option(
+    '-a, --audience <audience>',
+    'JWT audience (aud) claim - who the token is for (overrides key default)'
+  )
+  .option('--access-ttl <ttl>', 'Access token TTL (15m, 1h, etc.)', '15m')
+  .option('--refresh-ttl <ttl>', 'Refresh token TTL (7d, 30d, etc.)', '7d')
+  .option('--no-explain', 'Skip educational explanations')
+  .action(async (options) => {
+    try {
+      let customClaims = {};
+      if (options.payload !== '{}') {
+        customClaims = JSON.parse(options.payload);
+      }
+
+      await sessionManager.createSessionWithIssuerAudience(
+        options.name,
+        options.subject,
+        options.kid,
+        jwtOps,
+        customClaims,
+        options.accessTtl,
+        options.refreshTtl,
+        options.issuer,
+        options.audience,
+        options.explain
+      );
+    } catch (error) {
+      Logger.error(`Failed to generate session: ${error}`);
       process.exit(1);
     }
   });
@@ -304,8 +376,14 @@ program
   .command('configure-key')
   .description('Configure issuer and audience for an existing key')
   .requiredOption('-k, --key <key>', 'Key to configure')
-  .option('-i, --issuer <issuer>', 'JWT issuer (iss) claim - who issued the token')
-  .option('-a, --audience <audience>', 'JWT audience (aud) claim - who the token is for')
+  .option(
+    '-i, --issuer <issuer>',
+    'JWT issuer (iss) claim - who issued the token'
+  )
+  .option(
+    '-a, --audience <audience>',
+    'JWT audience (aud) claim - who the token is for'
+  )
   .option('--no-explain', 'Skip educational explanations')
   .action(async (options) => {
     try {
@@ -320,7 +398,6 @@ program
         options.audience,
         options.explain
       );
-
     } catch (error) {
       Logger.error(`Failed to configure key: ${error}`);
       process.exit(1);
@@ -330,7 +407,9 @@ program
 // Individual Export Commands
 program
   .command('export')
-  .description('Export individual JWT components (public-key, private-key, jwks)')
+  .description(
+    'Export individual JWT components (public-key, private-key, jwks)'
+  )
   .argument('<type>', 'What to export: public-key, private-key, or jwks')
   .requiredOption('-k, --key <key>', 'Key ID to export from')
   .option('--format <format>', 'Output format: pem (default) or raw', 'pem')
@@ -348,7 +427,7 @@ program
       const originalLog = console.log;
       const originalInfo = console.info;
       const originalError = console.error;
-      
+
       // Redirect all console output to stderr or null during the operation
       console.log = () => {};
       console.info = () => {};
@@ -359,24 +438,41 @@ program
       try {
         switch (type) {
           case 'public-key':
-            output = await jwksManager.exportPublicKeyAsSPKI(options.key, false);
+            output = await jwksManager.exportPublicKeyAsSPKI(
+              options.key,
+              false
+            );
             break;
 
           case 'private-key':
-            output = await jwksManager.exportPrivateKeyAsPKCS8(options.key, false);
+            output = await jwksManager.exportPrivateKeyAsPKCS8(
+              options.key,
+              false
+            );
             break;
 
           case 'jwks':
             if (options.format === 'raw') {
               // Export raw JWKS JSON for specific key
-              output = await jwksManager.exportJWKSAsBase64([options.key], false);
+              output = await jwksManager.exportJWKSAsBase64(
+                [options.key],
+                false
+              );
               // Decode the base64 to get raw JSON
-              const base64Data = output.replace('data:text/plain;charset=utf-8;base64,', '');
-              const jwksJson = Buffer.from(base64Data, 'base64').toString('utf-8');
+              const base64Data = output.replace(
+                'data:text/plain;charset=utf-8;base64,',
+                ''
+              );
+              const jwksJson = Buffer.from(base64Data, 'base64').toString(
+                'utf-8'
+              );
               output = JSON.stringify(JSON.parse(jwksJson), null, 2);
             } else {
               // Export base64-encoded JWKS (default)
-              output = await jwksManager.exportJWKSAsBase64([options.key], false);
+              output = await jwksManager.exportJWKSAsBase64(
+                [options.key],
+                false
+              );
             }
             break;
         }
@@ -389,7 +485,6 @@ program
 
       // Output only the raw content for piping
       console.log(output);
-
     } catch (error) {
       console.error(`Error: Failed to export ${type}: ${error}`);
       process.exit(1);
@@ -400,18 +495,39 @@ program
 program
   .command('export-env')
   .description('Export JWT keys as environment variables for Convex')
-  .option('-k, --key <key>', 'Specific key to export (exports both private key and JWKS)')
-  .option('--jwks-only', 'Export only JWKS (all public keys) without private key')
+  .option(
+    '-k, --key <key>',
+    'Specific key to export (exports both private key and JWKS)'
+  )
+  .option(
+    '--jwks-only',
+    'Export only JWKS (all public keys) without private key'
+  )
   .option('--all-keys', 'Export JWKS containing all public keys')
-  .option('-i, --issuer <issuer>', 'JWT issuer (iss) claim - who issued the token')
-  .option('-a, --audience <audience>', 'JWT audience (aud) claim - who the token is for')
-  .option('-f, --format <format>', 'Output format: console, file, or env-file', 'console')
-  .option('-o, --output <file>', 'Output file path (when format is file or env-file)')
+  .option(
+    '-i, --issuer <issuer>',
+    'JWT issuer (iss) claim - who issued the token'
+  )
+  .option(
+    '-a, --audience <audience>',
+    'JWT audience (aud) claim - who the token is for'
+  )
+  .option(
+    '-f, --format <format>',
+    'Output format: console, file, or env-file',
+    'console'
+  )
+  .option(
+    '-o, --output <file>',
+    'Output file path (when format is file or env-file)'
+  )
   .option('--no-explain', 'Skip educational explanations')
   .action(async (options) => {
     try {
       if (!options.key && !options.jwksOnly && !options.allKeys) {
-        Logger.error('Please specify --key <key-name>, --jwks-only, or --all-keys');
+        Logger.error(
+          'Please specify --key <key-name>, --jwks-only, or --all-keys'
+        );
         Logger.info('Use "list-keys" to see available keys');
         process.exit(1);
       }
@@ -420,22 +536,32 @@ program
 
       if (options.key) {
         // Export specific key (both private and public)
-        const result = await jwksManager.exportForConvexEnv(options.key, options.issuer, options.audience, options.explain);
-        
+        const result = await jwksManager.exportForConvexEnv(
+          options.key,
+          options.issuer,
+          options.audience,
+          options.explain
+        );
+
         if (options.format === 'env-file') {
           output = `JWT_PRIVATE_KEY="${result.privateKey}"\nJWT_PUBLIC_KEY="${result.publicKey}"\nJWKS="${result.jwks}"`;
           if (result.issuer) output += `\nCONVEX_JWT_ISSUER="${result.issuer}"`;
-          if (result.audience) output += `\nCONVEX_JWT_AUDIENCE="${result.audience}"`;
+          if (result.audience)
+            output += `\nCONVEX_JWT_AUDIENCE="${result.audience}"`;
           output += '\n';
         } else {
           output = `JWT_PRIVATE_KEY="${result.privateKey}"\nJWT_PUBLIC_KEY="${result.publicKey}"\nJWKS="${result.jwks}"`;
           if (result.issuer) output += `\nCONVEX_JWT_ISSUER="${result.issuer}"`;
-          if (result.audience) output += `\nCONVEX_JWT_AUDIENCE="${result.audience}"`;
+          if (result.audience)
+            output += `\nCONVEX_JWT_AUDIENCE="${result.audience}"`;
         }
       } else if (options.jwksOnly || options.allKeys) {
         // Export only JWKS (all public keys)
-        const jwks = await jwksManager.exportJWKSAsBase64(undefined, options.explain);
-        
+        const jwks = await jwksManager.exportJWKSAsBase64(
+          undefined,
+          options.explain
+        );
+
         if (options.format === 'env-file') {
           output = `JWKS="${jwks}"\n`;
         } else {
@@ -446,10 +572,12 @@ program
       // Output handling
       if (options.format === 'file' || options.format === 'env-file') {
         if (!options.output) {
-          Logger.error('Output file required when using --format file or env-file');
+          Logger.error(
+            'Output file required when using --format file or env-file'
+          );
           process.exit(1);
         }
-        
+
         const fs = require('fs');
         fs.writeFileSync(options.output, output);
         Logger.success(`Environment variables exported to: ${options.output}`);
@@ -457,7 +585,7 @@ program
         // Console output
         Logger.section('🌍 Convex Environment Variables');
         console.log('\n' + output + '\n');
-        
+
         if (options.explain) {
           Logger.info('Usage instructions:');
           Logger.info('1. Copy the above environment variables');
@@ -465,7 +593,6 @@ program
           Logger.info('3. Configure your Convex auth to use these values');
         }
       }
-
     } catch (error) {
       Logger.error(`Failed to export environment variables: ${error}`);
       process.exit(1);
@@ -485,7 +612,7 @@ program
     try {
       const clearKeys = !options.sessionsOnly;
       const clearSessions = !options.keysOnly;
-      
+
       if (options.explain) {
         Logger.section('🧹 Clear All Data');
         Logger.info('This command will remove:');
@@ -499,11 +626,14 @@ program
         const readline = require('readline');
         const rl = readline.createInterface({
           input: process.stdin,
-          output: process.stdout
+          output: process.stdout,
         });
 
         const answer = await new Promise<string>((resolve) => {
-          rl.question('\n⚠️  Are you sure you want to clear this data? (yes/no): ', resolve);
+          rl.question(
+            '\n⚠️  Are you sure you want to clear this data? (yes/no): ',
+            resolve
+          );
         });
         rl.close();
 
@@ -517,26 +647,32 @@ program
 
       // Clear keys if requested
       if (clearKeys) {
-        const keysSuccess = await jwksManager.clearAll(options.includeBackups, options.explain);
+        const keysSuccess = await jwksManager.clearAll(
+          options.includeBackups,
+          options.explain
+        );
         success = success && keysSuccess;
       }
 
       // Clear sessions if requested
       if (clearSessions) {
-        const sessionsSuccess = sessionManager.clearAllSessions(options.explain);
+        const sessionsSuccess = sessionManager.clearAllSessions(
+          options.explain
+        );
         success = success && sessionsSuccess;
       }
 
       if (success) {
         Logger.success('\n🎉 Clear operation completed successfully!');
         if (options.explain) {
-          Logger.info('You now have a clean slate for learning and experimentation.');
+          Logger.info(
+            'You now have a clean slate for learning and experimentation.'
+          );
         }
       } else {
         Logger.error('Some operations failed during clear');
         process.exit(1);
       }
-
     } catch (error) {
       Logger.error(`Failed to clear data: ${error}`);
       process.exit(1);
@@ -556,7 +692,7 @@ program
     JWTEducator.explainJWKS();
     JWTEducator.explainTokenVerification();
     JWTEducator.explainSecurity();
-    
+
     Logger.section('🚀 Next Steps');
     Logger.info('Try these commands to get hands-on experience:');
     Logger.info('1. npm run cli -- generate-key');
@@ -570,9 +706,9 @@ program
   .description('Compare different JWT signing algorithms')
   .action(() => {
     Logger.section('🔒 JWT Algorithm Comparison');
-    
+
     const algorithms = ['HS256', 'RS256', 'ES256', 'Ed25519'];
-    algorithms.forEach(alg => {
+    algorithms.forEach((alg) => {
       JWTEducator.explainAlgorithm(alg);
     });
 
@@ -580,9 +716,9 @@ program
     Logger.explain(
       'Algorithm Selection Guide',
       '• HS256 (HMAC): Simple, shared secret. Good for internal services.\n' +
-      '• RS256 (RSA): Most common. Good compatibility, larger tokens.\n' +
-      '• ES256 (ECDSA): Smaller keys and tokens, good performance.\n' +
-      '• Ed25519 (EdDSA): Modern, fast, secure. Great choice for new projects.'
+        '• RS256 (RSA): Most common. Good compatibility, larger tokens.\n' +
+        '• ES256 (ECDSA): Smaller keys and tokens, good performance.\n' +
+        '• Ed25519 (EdDSA): Modern, fast, secure. Great choice for new projects.'
     );
   });
 

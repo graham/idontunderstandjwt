@@ -249,29 +249,47 @@ export class JWTOperations {
         'A common pattern for secure authentication:\n' +
         '   • Access Token: Short-lived (15min), used for API requests\n' +
         '   • Refresh Token: Long-lived (7 days), used to get new access tokens\n' +
+        '   • Issuer and audience claims are included if configured on the key\n' +
         '   This minimizes the time window if an access token is compromised.'
       );
+    }
+
+    // Get issuer/audience from the key if available
+    const keyPair = await this.jwksManager.getKeyPair(kid);
+    if (!keyPair) {
+      Logger.error(`Key not found: ${kid}`);
+      throw new Error(`Key with ID ${kid} not found`);
     }
 
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     Logger.step(1, 'Creating Access Token');
-    const accessPayload = {
+    const accessPayload: TokenPayload = {
       ...payload,
       sub: subject,
       type: 'access',
       session_id: sessionId
     };
 
+    // Include issuer and audience from key if available
+    if (keyPair.issuer) accessPayload.iss = keyPair.issuer;
+    if (keyPair.audience) accessPayload.aud = keyPair.audience;
+
     const accessToken = await this.createToken(kid, accessPayload, accessTokenTTL, false);
     Logger.success(`Access token created (expires in ${accessTokenTTL})`);
+    if (keyPair.issuer) Logger.keyValue('Issuer', keyPair.issuer);
+    if (keyPair.audience) Logger.keyValue('Audience', keyPair.audience);
 
     Logger.step(2, 'Creating Refresh Token');
-    const refreshPayload = {
+    const refreshPayload: TokenPayload = {
       sub: subject,
       type: 'refresh',
       session_id: sessionId
     };
+
+    // Include issuer and audience from key if available
+    if (keyPair.issuer) refreshPayload.iss = keyPair.issuer;
+    if (keyPair.audience) refreshPayload.aud = keyPair.audience;
 
     const refreshToken = await this.createToken(kid, refreshPayload, refreshTokenTTL, false);
     Logger.success(`Refresh token created (expires in ${refreshTokenTTL})`);
@@ -283,7 +301,91 @@ export class JWTOperations {
         '   1. Use the access token for API requests (Authorization: Bearer <token>)\n' +
         '   2. When access token expires, use refresh token to get a new pair\n' +
         '   3. Store refresh token securely (httpOnly cookie recommended)\n' +
-        `   4. Session ID: ${sessionId} tracks this login session`
+        `   4. Session ID: ${sessionId} tracks this login session` +
+        (keyPair.issuer ? `\n   5. Issuer: ${keyPair.issuer}` : '') +
+        (keyPair.audience ? `\n   6. Audience: ${keyPair.audience}` : '') +
+        (keyPair.issuer || keyPair.audience ? '\n   7. Tokens include iss/aud claims for verification' : '')
+      );
+    }
+
+    return { accessToken, refreshToken, sessionId };
+  }
+
+  async createAccessRefreshTokenPairWithClaims(
+    kid: string,
+    subject: string,
+    payload: TokenPayload = {},
+    accessTokenTTL = '15m',
+    refreshTokenTTL = '7d',
+    issuer?: string,
+    audience?: string,
+    explain = true
+  ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
+    if (explain) {
+      Logger.section('🔄 Creating Access & Refresh Token Pair with Claims');
+      Logger.explain(
+        'Access & Refresh Tokens with Issuer/Audience',
+        'Creating tokens with specific issuer and audience claims:\n' +
+        '   • Access Token: Short-lived (15min), used for API requests\n' +
+        '   • Refresh Token: Long-lived (7 days), used to get new access tokens\n' +
+        '   • Issuer (iss): Who issued the tokens\n' +
+        '   • Audience (aud): Who the tokens are intended for\n' +
+        '   This provides additional security through claim verification.'
+      );
+    }
+
+    // First try to get issuer/audience from the key if not provided
+    const keyPair = await this.jwksManager.getKeyPair(kid);
+    if (!keyPair) {
+      Logger.error(`Key not found: ${kid}`);
+      throw new Error(`Key with ID ${kid} not found`);
+    }
+
+    const finalIssuer = issuer || keyPair.issuer;
+    const finalAudience = audience || keyPair.audience;
+
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    Logger.step(1, 'Creating Access Token with claims');
+    const accessPayload: TokenPayload = {
+      ...payload,
+      sub: subject,
+      type: 'access',
+      session_id: sessionId
+    };
+
+    if (finalIssuer) accessPayload.iss = finalIssuer;
+    if (finalAudience) accessPayload.aud = finalAudience;
+
+    const accessToken = await this.createToken(kid, accessPayload, accessTokenTTL, false);
+    Logger.success(`Access token created (expires in ${accessTokenTTL})`);
+    if (finalIssuer) Logger.keyValue('Issuer', finalIssuer);
+    if (finalAudience) Logger.keyValue('Audience', finalAudience);
+
+    Logger.step(2, 'Creating Refresh Token with claims');
+    const refreshPayload: TokenPayload = {
+      sub: subject,
+      type: 'refresh',
+      session_id: sessionId
+    };
+
+    if (finalIssuer) refreshPayload.iss = finalIssuer;
+    if (finalAudience) refreshPayload.aud = finalAudience;
+
+    const refreshToken = await this.createToken(kid, refreshPayload, refreshTokenTTL, false);
+    Logger.success(`Refresh token created (expires in ${refreshTokenTTL})`);
+
+    if (explain) {
+      Logger.explain(
+        'Token Usage with Claims',
+        'How to use these tokens:\n' +
+        '   1. Use the access token for API requests (Authorization: Bearer <token>)\n' +
+        '   2. When access token expires, use refresh token to get a new pair\n' +
+        '   3. Store refresh token securely (httpOnly cookie recommended)\n' +
+        `   4. Session ID: ${sessionId} tracks this login session` +
+        (finalIssuer ? `\n   5. Issuer: ${finalIssuer}` : '') +
+        (finalAudience ? `\n   6. Audience: ${finalAudience}` : '') +
+        '\n   7. Tokens include iss/aud claims for additional verification'
       );
     }
 
@@ -332,11 +434,27 @@ export class JWTOperations {
     Logger.keyValue('Session ID', sessionId);
 
     Logger.step(2, 'Creating new access token');
-    const newAccessPayload = {
+    
+    // Get issuer/audience from the key if available
+    const keyPair = await this.jwksManager.getKeyPair(kid);
+    if (!keyPair) {
+      Logger.error(`Key not found: ${kid}`);
+      throw new Error(`Key with ID ${kid} not found`);
+    }
+    
+    const newAccessPayload: TokenPayload = {
       sub: subject,
       type: 'access',
       session_id: sessionId
     };
+
+    // Include issuer and audience from key if available (preserving original token claims)
+    if (validResult.payload.iss || keyPair.issuer) {
+      newAccessPayload.iss = validResult.payload.iss as string || keyPair.issuer;
+    }
+    if (validResult.payload.aud || keyPair.audience) {
+      newAccessPayload.aud = validResult.payload.aud as string || keyPair.audience;
+    }
 
     const accessToken = await this.createToken(kid, newAccessPayload, newAccessTokenTTL, false);
     Logger.success('New access token created successfully');
